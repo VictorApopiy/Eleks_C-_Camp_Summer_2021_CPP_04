@@ -1,3 +1,6 @@
+#ifndef Server
+#define Server
+
 #include <iostream>
 #include <WinSock2.h>
 #include <cassert>
@@ -6,11 +9,11 @@
 #include <process.h>
 #include <thread>
 #include <list>
-#include <mutex>
-#define SERVER_LOG_FILE_NAME "ServerLogFile.bin"
+#include <sstream>
+const std::string g_sServerLogFileName = "ServerLogFile.bin";
 #pragma warning(disable:4996)
-#define BUFFER_SIZE 1024
-#define MESSAGE_SIZE 16
+const size_t g_uBufferSize  = 1024;
+const size_t g_iMessageSize = 16;
 #pragma comment(lib, "ws2_32.lib")
 /*
 CServer is a class that holds all the essential information about server.
@@ -25,16 +28,18 @@ private:
 	int iInfoSize;//size of this information
 	std::string sIpAddress;
 	int iPort;
-	char szMainBuffer[BUFFER_SIZE];//main buffer to send and receive info from clients
+	char szMainBuffer[g_uBufferSize];//main buffer to send and receive info from clients
 	std::ofstream ServerLogFile;//log file of server
 	std::list<std::thread> Threads;//thread pool for handling multiple clients
 private:
-	void init();
+	void Init();
 public:
-	CServer(std::string sIpAddress, int iPort);
+	CServer(const std::string& sIpAddress, int iPort);
 	~CServer();
 	void Start();
 	//method for sending file to client. it receives string filename and client socket as a parameters
-	void SendFile(std::string& sFileName,SOCKET& ClientSocket);
+	void SendFile(const std::string& sFileName,SOCKET& ClientSocket);
 	void HandleClient(SOCKET ClientSocket);
 };
+
+#endif

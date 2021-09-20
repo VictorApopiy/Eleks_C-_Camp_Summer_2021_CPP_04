@@ -1,12 +1,14 @@
-#pragma once
+#ifndef CClient
+#define CClient
+
 #include <string>
 #include <iostream>
 #include <winsock2.h>
 #include <WS2tcpip.h>
 #include <fstream>
 #include <cassert>
-#define MESSAGE_SIZE 16
-#define BUFFER_SIZE 1024
+const int g_iMessageSize  = 16;
+const int g_iBufferSize  = 1024;
 #pragma comment(lib, "ws2_32.lib")
 #pragma warning(disable:4996)
 /*
@@ -16,18 +18,19 @@ Basically, information and methods are analogue to server class
 class Client {
 private:
 	WSAData WSA;
-	char szMainBuffer[BUFFER_SIZE];
+	char szMainBuffer[g_iBufferSize];
 	SOCKET ClientSocket;
 	sockaddr_in ClientInfo;
 	int iClientInfoSize;
 	std::string sIpAddress;
 	int iPort;
 private:
-	void init();
+	void Init();
 public:
-	Client(std::string sIpAddress, int iPort);
+	Client(const std::string& sIpAddress,const int iPort);
 	~Client();
 	void RecvFile();
 	void ConnectToServer();
 };
+#endif //Client
 //отче наш...
