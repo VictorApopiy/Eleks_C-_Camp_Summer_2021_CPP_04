@@ -3,7 +3,9 @@
 CServer::CServer() :
 	ListeningSocket(INVALID_SOCKET),
 	sIpAddress(""),
-	iPort(0) {
+	iPort(0) ,
+	Time(std::time(0)),
+	CurrentTime(std::localtime(&Time)){
 	ZeroMemory(&ServerInfo, sizeof(ServerInfo));
 	iInfoSize = sizeof(ServerInfo);
 	ServerLogFile.open(g_sServerLogFileName,std::ios::binary|std::ios::app);
@@ -14,6 +16,14 @@ CServer::~CServer(){
 	if(ServerLogFile.is_open()){
 		ServerLogFile.close();
 	}
+}
+void CServer::LogInfo(const std::string& sInfo){
+	ServerLogFile<<"["<<CurrentTime->tm_year+1900<<":"<<
+	CurrentTime->tm_mon+1<<":"<<
+	CurrentTime->tm_mday<<":"<<
+	CurrentTime->tm_hour<<":"<<
+    CurrentTime->tm_min<<":"<<
+	CurrentTime->tm_sec<<"]"<<" "+sInfo<<std::endl;
 }
 void CServer::SetServer(const std::string& sIpAddress, const int iPort){
 	this->sIpAddress = sIpAddress;
@@ -47,24 +57,34 @@ bool CServer::CheckIP(){
 	return bResult;
 }
 void CServer::Init() {
+
 	assert(!WSAStartup(MAKEWORD(2, 2), &WSA)&&
 	"Couldn`t create WSA on Server");
-	ServerLogFile << "WSA started on Server!" << std::endl;
+	LogInfo("WSA started on Server!");
+
 	ServerInfo.sin_family = AF_INET;
 	ServerInfo.sin_port = htons(iPort);
 	ServerInfo.sin_addr.s_addr = inet_addr(sIpAddress.c_str());
+
 	assert(!((ListeningSocket = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) && 
 		"Couldn`t create Listening Socket on Server");
-	ServerLogFile << "Listening socket created on server!" << std::endl;
-	assert(!(bind(ListeningSocket, reinterpret_cast<const sockaddr*>(&ServerInfo), iInfoSize))&&"Couldn`t bind Listening socket");
-	ServerLogFile << "Listening socket binded!" << std::endl;
+	LogInfo("Listening socket created on server!");
+
+	assert(!(bind(ListeningSocket, 
+	reinterpret_cast<const sockaddr*>(&ServerInfo), iInfoSize))
+	&&"Couldn`t bind Listening socket");
+
+	LogInfo("Listening socket binded!");
 	listen(ListeningSocket, SOMAXCONN);
-	ServerLogFile << "Server started at:" << inet_ntoa(ServerInfo.sin_addr) 
-	<< ":" << ntohs(ServerInfo.sin_port) << std::endl;
-	ServerLogFile << "Socket listens..." << std::endl;
+
+	LogInfo("Server started at:" + 
+	 std::string(inet_ntoa(ServerInfo.sin_addr)) + ":" 
+	 + std::to_string(ntohs(ServerInfo.sin_port)));
+
+	LogInfo("Server listens...");
 }
 void CServer::HandleClient(SOCKET ClientSocket){
-	ServerLogFile << "Client connected with port:" << ntohs(ServerInfo.sin_port) << std::endl;
+	LogInfo("Client connected with port:" + std::to_string(ntohs(ServerInfo.sin_port)));
 	std::cout<< "Client connected with port:" << ntohs(ServerInfo.sin_port) << std::endl;
 	while(true){
 		if(recv(ClientSocket, szMainBuffer, g_uBufferSize, 0)>0){
@@ -76,12 +96,15 @@ void CServer::HandleClient(SOCKET ClientSocket){
 				ZeroMemory(szMainBuffer, sizeof(szMainBuffer));
 			}
 			else {
-				ServerLogFile<<"Received buffer from client with port:"<< 
-				ntohs(ServerInfo.sin_port)<<" "<<szMainBuffer << std::endl;
+				LogInfo("Received buffer from client with port:" + 
+					std::to_string(ntohs(ServerInfo.sin_port)) + " " +
+				 	std::string(szMainBuffer));
+				
 				std::string tmpBuf(szMainBuffer);
 				strcpy(szMainBuffer, tmpBuf.c_str());
 				send(ClientSocket, szMainBuffer, strlen(szMainBuffer)+1, 0);
-				ServerLogFile<<"Sent buffer to client "<<szMainBuffer<<std::endl;
+
+				LogInfo("Sent buffer to client "+ std::string(szMainBuffer));
 			}
 		}
 		else{
@@ -114,7 +137,7 @@ void CServer::SendFile(const std::string& sFileName,SOCKET& ClientSocket){
 
 		delete Buffer;
 		File.close();
-		ServerLogFile << "File was successfully sent to the client" << std::endl;
+		LogInfo("File " + sFileName +" was successfully sent to the client");
 	}
 	else {
 		char szErrorBuffer[g_iMessageSize] = "ERROR";

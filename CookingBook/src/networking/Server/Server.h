@@ -10,11 +10,15 @@
 #include <thread>
 #include <list>
 #include <sstream>
+#include <ctime>
+
 const std::string g_sServerLogFileName = "ServerLogFile.bin";
 const std::string sIPAddressFileName = "IPAddressFile.bin";
-#pragma warning(disable:4996)
 const size_t g_uBufferSize  = 1024;
 const size_t g_iMessageSize = 16;
+
+#pragma warning(disable:4996)
+
 #pragma comment(lib, "ws2_32.lib")
 /*
 CServer is a class that holds all the essential information about server.
@@ -33,6 +37,8 @@ private:
 	std::ofstream ServerLogFile;//log file of server
 	std::list<std::thread> Threads;//thread pool for handling multiple clients
 	std::fstream IPAddressFile;
+	std::time_t Time;
+	std::tm* CurrentTime;
 private:
 	void Init();
 public:
@@ -46,5 +52,6 @@ public:
 	bool CheckIP();
 	//if there is no ip address in file this func will write it to special file and set everything up 
 	void SetServer(const std::string& sIpAddress, int iPort);
+	void LogInfo(const std::string& sInfo);
 };
 #endif 
