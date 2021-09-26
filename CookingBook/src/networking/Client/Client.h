@@ -9,6 +9,7 @@
 #include <cassert>
 const int g_iMessageSize  = 16;
 const int g_iBufferSize  = 1024;
+const std::string sIPAddressFileName = "IPAddressFile.bin";
 #pragma comment(lib, "ws2_32.lib")
 #pragma warning(disable:4996)
 /*
@@ -24,13 +25,17 @@ private:
 	int iClientInfoSize;
 	std::string sIpAddress;
 	int iPort;
+	std::fstream IPAddressFile;
 private:
 	void Init();
 public:
-	Client(const std::string& sIpAddress,const int iPort);
+	Client();
 	~Client();
 	void RecvFile();
 	void ConnectToServer();
+	bool CheckIP();
+	void SetClient(const std::string& sIpaddress,const int iPort);
+	bool TryConnection();
 };
 #endif //Client
 //отче наш...

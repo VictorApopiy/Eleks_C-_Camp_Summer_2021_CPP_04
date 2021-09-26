@@ -1,9 +1,9 @@
 #include "Server.h"
 
-CServer::CServer(const std::string& sIpAddress, int iPort) :
+CServer::CServer() :
 	ListeningSocket(INVALID_SOCKET),
-	sIpAddress(sIpAddress),
-	iPort(iPort) {
+	sIpAddress(""),
+	iPort(0) {
 	ZeroMemory(&ServerInfo, sizeof(ServerInfo));
 	iInfoSize = sizeof(ServerInfo);
 	ServerLogFile.open(g_sServerLogFileName,std::ios::binary|std::ios::app);
@@ -14,6 +14,37 @@ CServer::~CServer(){
 	if(ServerLogFile.is_open()){
 		ServerLogFile.close();
 	}
+}
+void CServer::SetServer(const std::string& sIpAddress, const int iPort){
+	this->sIpAddress = sIpAddress;
+	this->iPort = iPort;
+	IPAddressFile.open(sIPAddressFileName,std::ios::binary|std::ios::out|std::ios::trunc);
+	IPAddressFile<<sIpAddress<<std::endl;
+	IPAddressFile<<iPort;
+	IPAddressFile.close();
+}
+bool CServer::CheckIP(){
+	IPAddressFile.open(sIPAddressFileName,std::ios::ate|std::ios::binary);
+	bool bResult;
+	if(IPAddressFile.is_open()){
+		if(IPAddressFile.tellg()==0){
+			bResult = false;
+		}
+		else{
+			IPAddressFile.close();
+			IPAddressFile.open(sIPAddressFileName,std::ios::binary);
+			std::getline(IPAddressFile,sIpAddress);
+			std::string sPort;
+			std::getline(IPAddressFile,sPort);
+			iPort = stoi(sPort);
+			bResult = true;
+		}
+		IPAddressFile.close();
+	}
+	else{
+		bResult = false;
+	}
+	return bResult;
 }
 void CServer::Init() {
 	assert(!WSAStartup(MAKEWORD(2, 2), &WSA)&&
@@ -40,7 +71,7 @@ void CServer::HandleClient(SOCKET ClientSocket){
 			if (strstr(szMainBuffer, "file")) {
 				recv(ClientSocket, szMainBuffer, g_uBufferSize, 0);
 				std::string sFileName = std::string(szMainBuffer);
-			
+
 				SendFile(sFileName,ClientSocket);
 				ZeroMemory(szMainBuffer, sizeof(szMainBuffer));
 			}
@@ -77,10 +108,11 @@ void CServer::SendFile(const std::string& sFileName,SOCKET& ClientSocket){
 		File.close();
 		File.open(sFileName, ios::binary);
 		send(ClientSocket, std::to_string(iDataSize).c_str(), g_iMessageSize, 0);
-		for(;iDataSize>0;iDataSize-=g_uBufferSize){
-			File.read(szMainBuffer,g_uBufferSize);
-			send(ClientSocket,szMainBuffer,g_uBufferSize,0);
-		}	
+		char* Buffer = new char[iDataSize];
+		File.read(Buffer,iDataSize);
+		send(ClientSocket,Buffer,iDataSize,0);
+
+		delete Buffer;
 		File.close();
 		ServerLogFile << "File was successfully sent to the client" << std::endl;
 	}
@@ -88,4 +120,4 @@ void CServer::SendFile(const std::string& sFileName,SOCKET& ClientSocket){
 		char szErrorBuffer[g_iMessageSize] = "ERROR";
 		send(ClientSocket, szErrorBuffer, g_iMessageSize, 0);
 	}
-}
+} 
