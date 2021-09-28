@@ -8,6 +8,8 @@
 #include <fstream>
 #include <cassert>
 #include <ctime>
+#include "SUser.h"
+
 const int g_iMessageSize  = 16;
 const int g_iBufferSize  = 1024;
 const std::string sIPAddressFileName = "IPAddressFile.bin";
@@ -36,13 +38,16 @@ private:
 public:
 	Client();
 	~Client();
-	void RecvFile();
+	void RecvFile(const std::string&sFileName);
 	void ConnectToServer();
 	bool CheckIP();
 	void SetClient(const std::string& sIpaddress,const int iPort);
 	bool TryConnection();
 	void LogInfo(const std::string& sInfo);
 	
+	//void RequestStruct(SUser& User);
+	bool RegisterUser(SUser& User);
+	bool LoginUser(SUser& User);
 };
 #endif //Client
 //отче наш...

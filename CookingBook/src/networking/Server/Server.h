@@ -11,6 +11,8 @@
 #include <list>
 #include <sstream>
 #include <ctime>
+#include "E:/EleksApp/Eleks_C_Camp_Summer_2021_CPP_04/CookingBook/src/DataBase/CUserDataBase.h"
+#include "E:/EleksApp/Eleks_C_Camp_Summer_2021_CPP_04/CookingBook/src/DataBase/sqlite3.h"
 
 const std::string g_sServerLogFileName = "ServerLogFile.bin";
 const std::string sIPAddressFileName = "IPAddressFile.bin";
@@ -39,6 +41,8 @@ private:
 	std::fstream IPAddressFile;
 	std::time_t Time;
 	std::tm* CurrentTime;
+
+	UsersDataBase::CUsersDataBase &refUserDataBase{UsersDataBase::CUsersDataBase::GetUsersDataBase()};
 private:
 	void Init();
 public:
@@ -53,5 +57,8 @@ public:
 	//if there is no ip address in file this func will write it to special file and set everything up 
 	void SetServer(const std::string& sIpAddress, int iPort);
 	void LogInfo(const std::string& sInfo);
+	bool TryRegisterUser(SOCKET& ClientSocket);
+	bool TryLoginUser(SOCKET&ClientSocket);
 };
+
 #endif 

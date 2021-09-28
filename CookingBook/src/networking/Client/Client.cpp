@@ -75,13 +75,11 @@ bool Client::TryConnection(){
 	return bResult;
 }
 
-void Client::RecvFile(){
-	std::cout << "Enter file name" << std::endl;
-	std::cin >> szMainBuffer;
-	send(ClientSocket, szMainBuffer,strlen(szMainBuffer)+1, 0);
+void Client::RecvFile(const std::string& sFileName){
+	
+	send(ClientSocket, sFileName.c_str(),sFileName.size()+1, 0);
 
 	LogInfo("Name of the file'"+ std::string(szMainBuffer)+ "' was requested");
-	const std::string sFileName(szMainBuffer);
 	char szTempSize[g_iMessageSize];
 	recv(ClientSocket, szTempSize, g_iMessageSize, 0);
 
@@ -97,13 +95,26 @@ void Client::RecvFile(){
 
 	std::ofstream File;
 	File.open(sFileName, std::ios::binary);
-	recv(ClientSocket,Buffer,iRecvBufferSize,0);
-
+	int iTmpRecvSize = iRecvBufferSize;
+	int iCount = 0;
+	while(iTmpRecvSize>0){
+		iCount = recv(ClientSocket,Buffer,iRecvBufferSize,0);
+		if(iCount==-1)break;
+		iTmpRecvSize-=iCount;
+	}
 	LogInfo("File input was received from server");
 	File.write(Buffer,iRecvBufferSize);
 	LogInfo("File was recreated on client successfully");
 	delete[] Buffer;
 	File.close();
+	std::ifstream InputFile;
+	InputFile.open(sFileName,std::ios::binary|std::ios::ate);
+	iTmpRecvSize = InputFile.tellg();
+	std::cout<<"file size = "<<iTmpRecvSize<<" received size = "<<iRecvBufferSize<<std::endl;
+	if(iTmpRecvSize!=iRecvBufferSize){
+		send(ClientSocket,"file",strlen("file"),0);
+		RecvFile(sFileName);
+	}
 }
 
 void Client::Init() {
@@ -127,8 +138,27 @@ void Client::ConnectToServer() {
 			send(ClientSocket, szMainBuffer, strlen(szMainBuffer)+1, 0);
 			LogInfo("Message was sent to server:"+  std::string(szMainBuffer));
 			if (strstr(szMainBuffer, "file")) {
-				RecvFile();
+				std::cout << "Enter file name" << std::endl;
+				std::cin >> szMainBuffer;
+				RecvFile(std::string(szMainBuffer));
 				ZeroMemory(szMainBuffer, sizeof(szMainBuffer));
+			}
+			if(strstr(szMainBuffer,"register")){
+				SUser someuser;
+				someuser.m_sUserName = "dadad";
+				someuser.m_sPassword = "1234";
+				someuser.m_sFavorites = "dada";
+				someuser.m_nID = 1;
+				RegisterUser(someuser);
+
+			}
+			if(strstr(szMainBuffer,"login")){
+				SUser someuser;
+				someuser.m_sUserName = "dadad";
+				someuser.m_sPassword = "djak";
+				someuser.m_sFavorites = "dada";
+				someuser.m_nID = 1;
+				LoginUser(someuser);
 			}
 			else {
 				recv(ClientSocket, szMainBuffer, g_iBufferSize, 0);
@@ -143,3 +173,46 @@ void Client::ConnectToServer() {
 		LogInfo("Couldn`t connect to server");
 	}
 } 
+
+bool Client::RegisterUser(SUser& User){
+	bool bResult;
+	char ServerRespond[g_iMessageSize];
+	send(ClientSocket,reinterpret_cast<char*>(&User),sizeof(User),0);
+	LogInfo("Register request was sent with login: "+User.m_sUserName);
+	recv(ClientSocket,ServerRespond,g_iMessageSize,0);
+	if(strstr(ServerRespond,"USER_EXISTS")){
+		LogInfo("USER_EXISTS message was received from server");
+		std::cout<<"USER_EXISTS message was received from server"<<std::endl;
+		bResult = false;
+	}
+	else{
+		LogInfo("New"+ User.m_sUserName+" was added to main user data base");
+		std::cout<<"New"+ User.m_sUserName+" was added to main user data base"<<std::endl;
+		bResult = true;
+	}
+	return bResult;
+}
+
+bool Client::LoginUser(SUser& User){
+	bool bResult;
+	send(ClientSocket,reinterpret_cast<char*>(&User),sizeof(User),0);
+	char szServerRespond[g_iBufferSize];
+	recv(ClientSocket,szServerRespond,g_iBufferSize,0);
+	if(strstr(szServerRespond,"USER_DOESNT_EXIST")){
+		bResult = false;
+		LogInfo("Incorrect login or password : "+User.m_sUserName+  " " + User.m_sPassword);
+		std::cout<<"Incorrect login or password : "+User.m_sUserName+  " " + User.m_sPassword<<std::endl;
+	}
+	else{
+		LogInfo("Login successful : "+User.m_sUserName + " " + User.m_sPassword);
+		std::cout<<"Login successful : "+User.m_sUserName + " " + User.m_sPassword<<std::endl;
+		bResult = true;
+	}
+	return bResult;
+}
+/*void Client::RequestStruct(SUser& User){
+	char SomeBuffer[g_iBufferSize];
+	send(ClientSocket,reinterpret_cast<char*>(&User),sizeof(User),0);
+	recv(ClientSocket,SomeBuffer,g_iBufferSize,0);
+	std::cout<<"Message received:"<<SomeBuffer<<std::endl;
+}*/
