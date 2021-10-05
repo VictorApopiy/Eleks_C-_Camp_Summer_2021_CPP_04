@@ -7,8 +7,6 @@
 
 namespace UsersDataBase {
 
-	class CUsersDataBaseDestroyer;
-
 	struct SUser {//structure which describes a User
 		int m_nID;
 		std::string m_sUserName;
@@ -23,48 +21,41 @@ namespace UsersDataBase {
 	class CUsersDataBase 
 	{
 	private:
-		
-		static CUsersDataBase* m_pUsersDataBase;
 		static int m_nAmountOfUsers;
-		static int m_nAmountOfObjects; //amount of CUsersDataBase objects
 		static const char* m_chPath;// path to the DB-file
-		static CUsersDataBaseDestroyer m_Destroyer; // an object which destroys an CUsersDataBase object
 		
-
 		CUsersDataBase();
 		CUsersDataBase(const char* chPath);
 		~CUsersDataBase();
-		friend class CUsersDataBaseDestroyer;
+		//
+		// this function create table for user`s info in data base
+		//Returns true, if table created successfully
+		static bool CreateTable();
 	public:
-		static CUsersDataBase* GetUsersDataBase(const char* chPath);//this function returns a pointer to the CUsersDataBase object
+		//
+		//this function takes a path to the directory and creates DB there
+		//Returns true, if initialization is successfull
+		static bool InitUsersDataBase(const char* chPath);
 
 		static void SetAmountOfUsers();
 		static int GetAmountOfUsers();
-
-		static bool CreateDB();
-		static bool CreateTable();
 
 		static bool InsertData(const SUser& SUser);
 		static bool AddToFavorites(const SUser& SUser, const int& nIdOfRecipe);
 
 		static SUser SelectUsersInfo(const std::string& Username);
-
+		//
+		//this function takes a structure of User, checks if a username exists in 
+		//data base and returns true, if the username exists
 		static bool CheckUsersExistence(const SUser& SUser);
+		//
+		//this function takes a structure of User, checks if a username and 
+		// a password are appropriate to each other.
+		//Return true, if it is appropriate 
 		static bool CheckUsersPassword(const SUser& SUser);
 
 		static bool DeleteFromFavorites(SUser& SUser, const int& nIdOfRecipe);
 		static bool DeleteUser(const int& nUsersID);
-	};
-
-
-	//CUsersDataBaseDestroyer is used for correct deleting CUsersDataBase
-	//object
-	class CUsersDataBaseDestroyer {
-	private:
-		CUsersDataBase* m_pUsersDB;
-	public:
-		~CUsersDataBaseDestroyer();
-		void InitDestroyer(CUsersDataBase* pUsersDB);
 	};
 }
 #endif

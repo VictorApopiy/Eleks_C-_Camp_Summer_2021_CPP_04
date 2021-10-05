@@ -86,6 +86,10 @@ namespace RecipesDataBase {
 			std::string sWordToFind, 
 			int& SizeOfCreatedList);
 
+
+		static bool SelectAllData();
+		static int callback(void* NotUsed, int argc, char** argv, char** azColName);
+
 		static bool UpdateRecipe(const SRecipe& SRecipe);
 		static bool DeleteRecipe(int nIdOfRecipe);
 	

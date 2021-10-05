@@ -337,6 +337,27 @@ bool RecipesDataBase::CRecipesDataBase::CheckIfRecipeHasAnIngredient(
 	return bIsInRecipe;
 }
 //-----------------------------------------------------------------------------
+bool RecipesDataBase::CRecipesDataBase::SelectAllData()
+{
+	sqlite3* sqliteDataBase;
+	int nExit = sqlite3_open(m_chPath, &sqliteDataBase);
+	if (nExit != SQLITE_OK) {
+		std::cerr << "Error opening table from SelectAllData" << std::endl;
+	}
+
+	std::string sQuery = "SELECT * FROM RECIPES;";
+	sqlite3_exec(sqliteDataBase, sQuery.c_str(), callback, NULL, NULL);
+	return 0;
+}
+//-----------------------------------------------------------------------------
+int RecipesDataBase::CRecipesDataBase::callback(void* NotUsed, int argc, char** argv, char** azColName) {
+	for (int i = 0;i < argc;i++) {
+			std::cout << azColName[i] << ": " << argv[i] << std::endl;
+	}
+	std::cout << std::endl;
+	return 0;
+}
+//-----------------------------------------------------------------------------
 bool RecipesDataBase::CRecipesDataBase::UpdateRecipe(const SRecipe& SRecipe)
 {
 	sqlite3* sqliteDataBase;

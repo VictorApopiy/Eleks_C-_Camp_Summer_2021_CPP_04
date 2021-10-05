@@ -1,11 +1,7 @@
 #include "usersdatabase.h"
 
-UsersDataBase::CUsersDataBase* UsersDataBase::CUsersDataBase::m_pUsersDataBase=nullptr;
 int UsersDataBase::CUsersDataBase::m_nAmountOfUsers = 0;
-int UsersDataBase::CUsersDataBase::m_nAmountOfObjects = 0;
-UsersDataBase::CUsersDataBaseDestroyer UsersDataBase::CUsersDataBase::m_Destroyer;
 const char* UsersDataBase::CUsersDataBase::m_chPath = "";
-//UsersDataBase::SUser UsersDataBase::CUsersDataBase::m_user;
 
 //-----------------------------------------------------------------------------
 UsersDataBase::CUsersDataBase::CUsersDataBase()
@@ -15,11 +11,18 @@ UsersDataBase::CUsersDataBase::CUsersDataBase()
 //-----------------------------------------------------------------------------
 UsersDataBase::CUsersDataBase::CUsersDataBase(const char* chPath)
 {
-	m_chPath = const_cast<char*>(chPath);
+	m_chPath = chPath;
 }
 //-----------------------------------------------------------------------------
 UsersDataBase::CUsersDataBase::~CUsersDataBase()
 {
+}
+bool UsersDataBase::CUsersDataBase::InitUsersDataBase(const char* chPath)
+{
+	m_chPath = chPath;
+	bool bResult = false;
+	bResult = CreateTable();
+	return bResult;
 }
 //-----------------------------------------------------------------------------
 void UsersDataBase::CUsersDataBase::SetAmountOfUsers()
@@ -48,21 +51,6 @@ void UsersDataBase::CUsersDataBase::SetAmountOfUsers()
 int UsersDataBase::CUsersDataBase::GetAmountOfUsers()
 {
 	return m_nAmountOfUsers;
-}
-//-----------------------------------------------------------------------------
-bool UsersDataBase::CUsersDataBase::CreateDB()
-{
-	sqlite3* sqliteDataBase;
-	int nExit = sqlite3_open(m_chPath, &sqliteDataBase);
-
-	if (nExit == SQLITE_OK) {
-		std::cout << "sqliteDataBase created successfully";
-	}
-	else {
-		std::cout << "Error creation sqliteDataBase";
-	}
-	sqlite3_close(sqliteDataBase);
-	return true;
 }
 //-----------------------------------------------------------------------------
 bool UsersDataBase::CUsersDataBase::CreateTable()
@@ -126,20 +114,6 @@ bool UsersDataBase::CUsersDataBase::InsertData(const SUser& SUser)
 	return bResult;	
 }
 //-----------------------------------------------------------------------------
-
-//-----------------------------------------------------------------------------
-
-UsersDataBase::CUsersDataBase* UsersDataBase::CUsersDataBase::GetUsersDataBase(const char* chPath)
-{
-	if (m_nAmountOfObjects == 0) {
-		m_pUsersDataBase = new CUsersDataBase(chPath);
-		m_Destroyer.InitDestroyer(m_pUsersDataBase);
-		m_nAmountOfObjects++;
-	}
-	return m_pUsersDataBase;
-}
-//-----------------------------------------------------------------------------
-
 UsersDataBase::SUser UsersDataBase::CUsersDataBase::SelectUsersInfo(const std::string& Username)
 {
 	SUser user;
@@ -158,9 +132,9 @@ UsersDataBase::SUser UsersDataBase::CUsersDataBase::SelectUsersInfo(const std::s
 		else {
 			while ((nStatus = sqlite3_step(InfoFromDB) == SQLITE_ROW)) {
 				user.m_nID = sqlite3_column_int(InfoFromDB, 0);
-				user.m_sUserName = (char*)sqlite3_column_text(InfoFromDB, 1);
-				user.m_sPassword = (char*)sqlite3_column_text(InfoFromDB, 2);
-				user.m_sFavorites = (char*)sqlite3_column_text(InfoFromDB, 3);
+				user.m_sUserName = reinterpret_cast<char*>(const_cast<unsigned char*>(sqlite3_column_text(InfoFromDB, 1)));
+				user.m_sPassword = reinterpret_cast<char*>(const_cast<unsigned char*>(sqlite3_column_text(InfoFromDB, 2)));
+				user.m_sFavorites = reinterpret_cast<char*>(const_cast<unsigned char*>(sqlite3_column_text(InfoFromDB, 3)));
 			}
 		}
 		sqlite3_finalize(InfoFromDB);
@@ -184,7 +158,7 @@ bool UsersDataBase::CUsersDataBase::CheckUsersExistence(const SUser& SUser)
 		}
 		else {
 			while ((nStatus = sqlite3_step(InfoFromDB) == SQLITE_ROW)) {
-				bUserExistence = (bool)sqlite3_column_int(InfoFromDB, 0);
+				bUserExistence = static_cast<bool>(sqlite3_column_int(InfoFromDB, 0));
 			}
 		}
 		sqlite3_finalize(InfoFromDB);
@@ -208,7 +182,7 @@ bool UsersDataBase::CUsersDataBase::CheckUsersPassword(const SUser& SUser)
 		}
 		else {
 			while ((nStatus = sqlite3_step(InfoFromDB) == SQLITE_ROW)) {
-				bUserExistence = (bool)sqlite3_column_int(InfoFromDB, 0);
+				bUserExistence = static_cast<bool>(sqlite3_column_int(InfoFromDB, 0));
 			}
 		}
 		sqlite3_finalize(InfoFromDB);
@@ -308,19 +282,6 @@ bool UsersDataBase::CUsersDataBase::DeleteUser(const int& nUsersID)
 	return bResult;
 }
 //-----------------------------------------------------------------------------
-
-UsersDataBase::CUsersDataBaseDestroyer::~CUsersDataBaseDestroyer()
-{
-	if (m_pUsersDB) {
-		delete m_pUsersDB;
-	}
-}
-//-----------------------------------------------------------------------------
-void UsersDataBase::CUsersDataBaseDestroyer::InitDestroyer(CUsersDataBase* pUsersDB)
-{
-	this->m_pUsersDB = pUsersDB;
-}
-
 UsersDataBase::SUser::SUser():m_nID{0},m_sUserName{""},m_sPassword{""},m_sFavorites{""}
 {
 }
