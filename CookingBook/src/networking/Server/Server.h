@@ -11,9 +11,15 @@
 #include <list>
 #include <sstream>
 #include <ctime>
-#include "E:/EleksApp/Eleks_C_Camp_Summer_2021_CPP_04/CookingBook/src/DataBase/CUserDataBase.h"
-#include "E:/EleksApp/Eleks_C_Camp_Summer_2021_CPP_04/CookingBook/src/DataBase/sqlite3.h"
+#include <vector>
+#include "UserDataBase/CUserDataBase.h"
+#include "UserDatabase/sqlite3.h"
 
+#include "Requests.h"
+
+#include <algorithm>
+
+#include "RecipesDataBase/recipesdatabase.h"
 const std::string g_sServerLogFileName = "ServerLogFile.bin";
 const std::string sIPAddressFileName = "IPAddressFile.bin";
 const size_t g_uBufferSize  = 1024;
@@ -42,9 +48,17 @@ private:
 	std::time_t Time;
 	std::tm* CurrentTime;
 
-	UsersDataBase::CUsersDataBase &refUserDataBase{UsersDataBase::CUsersDataBase::GetUsersDataBase()};
+	UsersDataBase::CUsersDataBase *refUserDataBase{UsersDataBase::CUsersDataBase::GetUsersDataBase("Users.db")};
 private:
 	void Init();
+	RecipesDataBase::SRecipe ReceiveRecipe(SOCKET &ClientSocket);
+
+	void SendStringVector(std::vector<std::string>&Vector,SOCKET& ClientSocket);
+	std::vector<std::string> ReceiveStringVector(SOCKET ClientSocket);
+	void SendRecipe(RecipesDataBase::SRecipe&Recipe, SOCKET&ClientSocket);
+
+	void SendUser(UsersDataBase::SUser&User,SOCKET&ClientSocket);
+	UsersDataBase::SUser ReceiveUser(SOCKET&ClientSocket);
 public:
 	CServer();
 	~CServer();
@@ -59,6 +73,20 @@ public:
 	void LogInfo(const std::string& sInfo);
 	bool TryRegisterUser(SOCKET& ClientSocket);
 	bool TryLoginUser(SOCKET&ClientSocket);
+	
+	bool AddRecipeFromClient(SOCKET &ClientSocket);
+
+	bool FindRecipeByNameFromClient(SOCKET&ClientSocket);
+
+	bool SendRecipesNeededForClient(SOCKET&ClientSocket);
+
+	void SendRecipesByOwnersIdToClient(SOCKET&ClientSocket);
+
+	void SendRecipesByName(SOCKET&ClientSocket);
+
+	bool ChangeRecipe(SOCKET&ClientSocket);
+
+	bool DeleteRecipe(SOCKET&ClientSocket);
 };
 
 #endif 
