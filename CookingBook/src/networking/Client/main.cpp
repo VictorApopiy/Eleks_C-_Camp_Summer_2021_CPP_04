@@ -1,10 +1,12 @@
 #include "Client.h"
+#define IP_ADDRESS "127.0.0.1"
+#define PORT 1234
 int main(){
+
+    
     Client client;
-    std::string sIpAddress = "127.0.0.1";
-    int iPort = 1234;
     if(!client.CheckIP()){
-        client.SetClient(sIpAddress,iPort);
+        client.SetClient(IP_ADDRESS,PORT);
     }
     client.ConnectToServer();
     return 0;
