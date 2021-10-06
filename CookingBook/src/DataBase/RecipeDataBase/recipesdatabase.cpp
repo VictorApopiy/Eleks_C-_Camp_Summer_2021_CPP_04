@@ -215,7 +215,7 @@ std::vector<std::string> RecipesDataBase::CRecipesDataBase::SelectRecipes(
 	}
 	else {
 		std::string sQuery = "SELECT NAME, INGREDIENTS FROM RECIPES WHERE IS_ACCESSIBLE = 1 ";
-		if (namesOfColumns.size() != 0) {
+		if (namesOfColumns.size() != 0 && values.size()!=0 && namesOfColumns.size()== values.size()) {
 			for (int i = 0;i < namesOfColumns.size();i++) {
 				sQuery += " AND " + namesOfColumns[i] + " = '" + values[i] + "'";
 			}
@@ -239,6 +239,10 @@ std::vector<std::string> RecipesDataBase::CRecipesDataBase::SelectRecipes(
 						NamesOfRecipes.push_back(reinterpret_cast<char*>
 							(const_cast<unsigned char*>(sqlite3_column_text(InfoFromDB, 0))));
 					}
+				}
+				else {
+					NamesOfRecipes.push_back(reinterpret_cast<char*>
+						(const_cast<unsigned char*>(sqlite3_column_text(InfoFromDB, 0))));
 				}
 			}
 		}
@@ -335,27 +339,6 @@ bool RecipesDataBase::CRecipesDataBase::CheckIfRecipeHasAnIngredient(
 		}
 	}
 	return bIsInRecipe;
-}
-//-----------------------------------------------------------------------------
-bool RecipesDataBase::CRecipesDataBase::SelectAllData()
-{
-	sqlite3* sqliteDataBase;
-	int nExit = sqlite3_open(m_chPath, &sqliteDataBase);
-	if (nExit != SQLITE_OK) {
-		std::cerr << "Error opening table from SelectAllData" << std::endl;
-	}
-
-	std::string sQuery = "SELECT * FROM RECIPES;";
-	sqlite3_exec(sqliteDataBase, sQuery.c_str(), callback, NULL, NULL);
-	return 0;
-}
-//-----------------------------------------------------------------------------
-int RecipesDataBase::CRecipesDataBase::callback(void* NotUsed, int argc, char** argv, char** azColName) {
-	for (int i = 0;i < argc;i++) {
-			std::cout << azColName[i] << ": " << argv[i] << std::endl;
-	}
-	std::cout << std::endl;
-	return 0;
 }
 //-----------------------------------------------------------------------------
 bool RecipesDataBase::CRecipesDataBase::UpdateRecipe(const SRecipe& SRecipe)
