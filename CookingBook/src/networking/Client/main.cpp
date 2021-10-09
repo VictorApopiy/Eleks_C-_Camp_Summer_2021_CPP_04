@@ -1,13 +1,11 @@
-#include "Client.h"
-#define IP_ADDRESS "127.0.0.1"
-#define PORT 1234
-int main(){
+#include "mainwindow.h"
 
-    
-    Client client;
-    if(!client.CheckIP()){
-        client.SetClient(IP_ADDRESS,PORT);
-    }
-    client.ConnectToServer();
-    return 0;
+#include <QApplication>
+
+int main(int argc, char *argv[])
+{
+    QApplication a(argc, argv);
+    MainWindow w;
+    w.show();
+    return a.exec();
 }

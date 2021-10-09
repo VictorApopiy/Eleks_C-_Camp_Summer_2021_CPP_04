@@ -20,6 +20,8 @@ CServer::~CServer(){
 }
 
 void CServer::LogInfo(const std::string& sInfo){
+	Time = std::time(0);
+	CurrentTime = std::localtime(&Time);
 	ServerLogFile<<"["<<CurrentTime->tm_year+1900<<":"<<
 	CurrentTime->tm_mon+1<<":"<<
 	CurrentTime->tm_mday<<":"<<
@@ -117,6 +119,14 @@ void CServer::HandleClient(SOCKET ClientSocket){
 		if(recv(ClientSocket, szMainBuffer, g_uBufferSize, 0)>0){
 			std::cout<<"Buffer received:"<<szMainBuffer<<std::endl;
 			do{
+				if(strstr(szMainBuffer,"vector")){
+					std::vector<std::string> vec;
+                    vec = ReceiveStringVector(ClientSocket);
+					std::for_each(begin(vec),end(vec),[](const std::string& val){
+						std::cout<<val<<"\t";
+					});
+					std::cout<<std::endl;
+				}
 				if (strstr(szMainBuffer, FILE_REQUEST)) {
 					LogInfo("'File' request was sent");
 					ZeroMemory(szMainBuffer,g_uBufferSize);
@@ -222,8 +232,10 @@ void CServer::HandleClient(SOCKET ClientSocket){
 
 void CServer::Start() {
 	Init();
-	UsersDataBase::CUsersDataBase::CreateTable();
-	RecipesDataBase::CRecipesDataBase::CreateTable();
+    UsersDataBase::CUsersDataBase::InitUsersDataBase
+            ("Users.db");
+    RecipesDataBase::CRecipesDataBase::InitRecipesDataBase
+            ("Recipes.db");
 	LogInfo("Server was initialized");
 	while (true) {
 		SOCKET AcceptingSocket = accept(ListeningSocket, reinterpret_cast<sockaddr*>(&ServerInfo), &iInfoSize);
@@ -244,7 +256,7 @@ void CServer::SendRecipesByName(SOCKET&ClientSocket){
 	std::vector<std::string> szRecipes = RecipesDataBase::CRecipesDataBase::SearchByName(sWord,iVectorSize);
 	if(szRecipes.size()!=0){
 		send(ClientSocket,szRecipeFound,strlen(szRecipeFound),0);
-		SendStringVector(szRecipes,ClientSocket);
+        SendStringVector(szRecipes,ClientSocket);
 	}
 	else{
 		send(ClientSocket,szRecipeNotFound,strlen(szRecipeNotFound),0);
@@ -284,7 +296,8 @@ void CServer::SendFile(const std::string& sFileName,SOCKET& ClientSocket){
 bool CServer::TryRegisterUser(SOCKET& ClientSocket){
 	bool bResult = false;
 	UsersDataBase::SUser ReceivedUser;
-	recv(ClientSocket,reinterpret_cast<char*>(&ReceivedUser),sizeof(ReceivedUser),0);
+	//recv(ClientSocket,reinterpret_cast<char*>(&ReceivedUser),sizeof(ReceivedUser),0);
+	ReceivedUser = ReceiveUser(ClientSocket);
 	const char* szUserExists = "USER_EXISTS";
 	const char* szUserAdded = "USER_ADDED";
 	if(UsersDataBase::CUsersDataBase::CheckUsersExistence(ReceivedUser)){
@@ -293,11 +306,13 @@ bool CServer::TryRegisterUser(SOCKET& ClientSocket){
 	}
 	else{
 		UsersDataBase::CUsersDataBase::InsertData(ReceivedUser);
-		send(ClientSocket,szUserAdded,strlen(szUserAdded),0);
+        send(ClientSocket,szUserAdded,strlen(szUserAdded),0);
 		LogInfo("USER_ADDED message was sent to the client");
 
 		ReceivedUser = UsersDataBase::CUsersDataBase::SelectUsersInfo(ReceivedUser.m_sUserName);
-		send(ClientSocket,reinterpret_cast<char*>(&ReceivedUser),sizeof(ReceivedUser),0);
+		SendUser(ReceivedUser,ClientSocket);
+
+		//send(ClientSocket,reinterpret_cast<char*>(&ReceivedUser),sizeof(ReceivedUser),0);
 		std::cout<<"User id:"<<ReceivedUser.m_nID<<std::endl;
 		bResult = true;
 	}
@@ -306,7 +321,7 @@ bool CServer::TryRegisterUser(SOCKET& ClientSocket){
 
 void CServer::SendUser(UsersDataBase::SUser&User,SOCKET&ClientSocket){
 	std::stringstream sDataStream;
-	sDataStream<<User.m_nID<<"\t"<<User.m_sFavorites<<"\t"
+	sDataStream<<std::to_string(User.m_nID)<<"\t"<<User.m_sFavorites<<"\t"
 	<<User.m_sPassword<<"\t"<<User.m_sUserName<<std::endl;
 	send(ClientSocket,std::to_string(strlen(sDataStream.str().c_str())).c_str(),g_uBufferSize,0);
 	send(ClientSocket,sDataStream.str().c_str(),strlen(sDataStream.str().c_str()),0);
@@ -341,6 +356,7 @@ bool CServer::TryLoginUser(SOCKET&ClientSocket){
 	bool bResult = true;
 	UsersDataBase::SUser ReceivedUser;
 	std::cout<<"receiving user..."<<std::endl;
+	//recv(ClientSocket,reinterpret_cast<char*>(&ReceivedUser),sizeof(ReceivedUser),0);
 	ReceivedUser = ReceiveUser(ClientSocket);
 	std::cout<<"User received"<<std::endl;
 	std::cout<<ReceivedUser.m_sUserName<<std::endl;
@@ -383,14 +399,13 @@ bool CServer::ChangeRecipe(SOCKET&ClientSocket){
 }
 
 void CServer::SendStringVector(std::vector<std::string>&Vector, SOCKET& ClientSocket){
-	std::stringstream sDataStream;
-	std::for_each(begin(Vector),end(Vector),[this,&sDataStream](const std::string& sValue){
-		sDataStream<<sValue<<"\t";
-	});
-	send(ClientSocket,std::to_string(sDataStream.str().size()).c_str(),g_iMessageSize,0);
-	send(ClientSocket,sDataStream.str().c_str(),sDataStream.str().size(),0);
+    char szVectorSize[g_uBufferSize];
+    strcpy(szVectorSize,std::to_string(Vector.size()).c_str());
+    send(ClientSocket,szVectorSize,strlen(szVectorSize),0);
+    for(size_t i = 0; i<Vector.size();i++){
+        send(ClientSocket,Vector[i].c_str(),strlen(Vector[i].c_str()),0);
+    }
 }
-
 void CServer::SendRecipe(RecipesDataBase::SRecipe&Recipe,SOCKET&ClientSocket){
 	std::stringstream RecipeDataStream;
 	RecipeDataStream<<Recipe.m_bIsAccessible<<"\t"
@@ -409,23 +424,20 @@ bool CServer::SendRecipesNeededForClient(SOCKET&ClientSocket){
 	bool bResult = false;
 	std::vector<std::string> RecipesNeeded, RecipesCategories,
 	RecipesCategoryValues,RecipesIngredients;
-
-	RecipesCategories = ReceiveStringVector(ClientSocket);
-	RecipesCategoryValues = ReceiveStringVector(ClientSocket);
-	RecipesIngredients =  ReceiveStringVector(ClientSocket);
+    RecipesCategories = ReceiveStringVector(ClientSocket);
+    RecipesCategoryValues = ReceiveStringVector(ClientSocket);
+    RecipesIngredients =  ReceiveStringVector(ClientSocket);
 	int iRecipesNeededSize = 0;
 
 	RecipesNeeded = RecipesDataBase::CRecipesDataBase::SelectRecipes(RecipesCategories,
 	RecipesCategoryValues,
 	RecipesIngredients,
 	iRecipesNeededSize);
-	std::cout<<"recipe column = "<<RecipesCategories[0]<<std::endl;
 	const char* szRecipeFound = "RECIPE_FOUND";
 	const char* szRecipeNotFound = "RECIPE_NOT_FOUND";
 	if(RecipesNeeded.size()!=0){
 		send(ClientSocket,szRecipeFound,strlen(szRecipeFound),0);
 		SendStringVector(RecipesNeeded,ClientSocket);
-		//std::cout<<"recipe found "<<RecipesNeeded[0]<<std::endl;
 		bResult = true;
 
 	}else{
@@ -477,28 +489,17 @@ bool CServer::FindRecipeByNameFromClient(SOCKET&ClientSocket){
 }
 
 std::vector<std::string> CServer::ReceiveStringVector(SOCKET ClientSocket){
-	char szTmpSize[g_iMessageSize];
-	std::cout<<"receiving size"<<std::endl;
-	recv(ClientSocket,szTmpSize,g_iMessageSize,0);
-	LogInfo("size received = " + std::to_string(atoi(szTmpSize)));
-	std::vector<std::string> sVector;
-	if(atoi(szTmpSize)){
-		LogInfo("alocating memory");
-		char* szBuffer = new char[atoi(szTmpSize)];
-		LogInfo("memory alocated");
-		recv(ClientSocket,szBuffer,atoi(szTmpSize),0);
-		LogInfo("buffer:" + std::string(szBuffer));
-		std::stringstream sDataStream(szBuffer);
-		std::string sTmp;
-		while(std::getline(sDataStream,sTmp,'\t')){
-			sVector.emplace_back(sTmp);
-		}
-		if(szBuffer){
-			delete[]szBuffer;
-		}
-	}
-	
-	return sVector;
+    char szTmpSize[g_uBufferSize];
+    char szTmpVector[g_uBufferSize];
+    std::vector<std::string> sVector;
+    recv(ClientSocket,szTmpSize,g_uBufferSize,0);
+    std::cout<<"received buffer size :"<<atoi(szTmpSize)<<std::endl;
+    for(int i = 0;i<atoi(szTmpSize);i++){
+        recv(ClientSocket,szTmpVector,g_uBufferSize,0);
+        sVector.push_back(std::string(szTmpVector));
+        ZeroMemory(szTmpVector,g_uBufferSize);
+    }
+    return sVector;
 }
 RecipesDataBase::SRecipe CServer::ReceiveRecipe(SOCKET&ClientSocket){
 	RecipesDataBase::SRecipe RecipeResult;

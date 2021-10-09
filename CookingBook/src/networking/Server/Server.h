@@ -48,7 +48,7 @@ private:
 	std::time_t Time;
 	std::tm* CurrentTime;
 
-	UsersDataBase::CUsersDataBase *refUserDataBase{UsersDataBase::CUsersDataBase::GetUsersDataBase("Users.db")};
+    //UsersDataBase::CUsersDataBase *refUserDataBase{UsersDataBase::CUsersDataBase::GetUsersDataBase("Users.db")};
 private:
 	void Init();
 	RecipesDataBase::SRecipe ReceiveRecipe(SOCKET &ClientSocket);

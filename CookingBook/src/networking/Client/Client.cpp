@@ -23,6 +23,8 @@ Client::~Client() {
 }
 
 void Client::LogInfo(const std::string& sInfo){
+	Time = std::time(0);
+	CurrentTime = std::localtime(&Time);
 	ClientLogFile<<"["<<CurrentTime->tm_year+1900<<":"<<
 	CurrentTime->tm_mon+1<<":"<<
 	CurrentTime->tm_mday<<":"<<
@@ -38,6 +40,12 @@ void Client::SetClient(const std::string& sIpAddress, const int iPort){
 	IPAddressFile<<sIpAddress<<std::endl;
 	IPAddressFile<<iPort;
 	IPAddressFile.close();
+}
+
+std::string Client::ReceiveMessage(){
+    ZeroMemory(szMainBuffer,g_iBufferSize);
+    recv(ClientSocket,szMainBuffer,g_iBufferSize,0);
+    return std::string(szMainBuffer);
 }
 
 bool Client::CheckIP(){
@@ -172,15 +180,12 @@ SRecipe Client::ReceiveRecipe(SOCKET&ClientSocket){
 }
 
 void Client::SendStringVector(std::vector<std::string>&Vector){
-	std::stringstream sDataStream;
-	std::for_each(begin(Vector),end(Vector),[this,&sDataStream](const std::string& sValue){
-		sDataStream<<sValue<<"\t";
-	});
-	LogInfo(sDataStream.str());
-	send(ClientSocket,std::to_string(sDataStream.str().size()).c_str(),g_iMessageSize,0);
-	
-
-	send(ClientSocket,sDataStream.str().c_str(),sDataStream.str().size(),0);
+    char szVectorSize[g_iBufferSize];
+    strcpy(szVectorSize,std::to_string(Vector.size()).c_str());
+    send(ClientSocket,szVectorSize,strlen(szVectorSize),0);
+    for(size_t i = 0; i<Vector.size();i++){
+        send(ClientSocket,Vector[i].c_str(),strlen(Vector[i].c_str()),0);
+    }
 }
 
 bool Client::GetRecipesNeeded(std::vector<std::string>& RecipesNeeded,
@@ -190,7 +195,9 @@ bool Client::GetRecipesNeeded(std::vector<std::string>& RecipesNeeded,
 
 	bool bResult = false;
 	SendStringVector(RecipesCategories);
+    Sleep(100);
 	SendStringVector(RecipesCategoryValues);
+    Sleep(100);
 	SendStringVector(RecipesIngredients);
 	char szAnswer[g_iBufferSize];
 	recv(ClientSocket,szAnswer,g_iBufferSize,0);
@@ -230,39 +237,35 @@ void Client::ConnectToServer(){
 			std::string sMessage;
 			std::cin>>sMessage;
 			send(ClientSocket,sMessage.c_str(),sMessage.size(),0);
-			if(strstr(sMessage.c_str(),GET_RECIPE_BY_NAME_REQUEST)){
-				SRecipe rec;
-				std::string name = "salad with tomatoes";
-				FindRecipeByName(name,rec);
-				
-			}
-			else{
-				ZeroMemory(szMainBuffer,g_iBufferSize);
-				recv(ClientSocket,szMainBuffer,g_iBufferSize,0);
-				std::cout<<szMainBuffer<<std::endl;
-			}
+			do{
+				if(strstr(sMessage.c_str(),LOGIN_REQUEST)){
+					ClientUser.m_sUserName = "abc";
+					ClientUser.m_sPassword = "123";
+					LoginUser(ClientUser);
+					std::cout<<ClientUser.m_nID<<std::endl;
+					break;
+				}
+				else{
+					ZeroMemory(szMainBuffer,g_iBufferSize);
+					recv(ClientSocket,szMainBuffer,g_iBufferSize,0);
+					std::cout<<szMainBuffer<<std::endl;
+				}	
+			}while(0);
+			
 		}
 	}
 }
 
 std::vector<std::string> Client::ReceiveStringVector(){
-	char szTmpSize[g_iMessageSize];
-	recv(ClientSocket,szTmpSize,g_iMessageSize,0);
-	std::vector<std::string> sVector;
-	if(atoi(szTmpSize)){
-		char* szBuffer = new char[atoi(szTmpSize)];
-		recv(ClientSocket,szBuffer,atoi(szTmpSize),0);
-		std::stringstream sDataStream(szBuffer);
-		std::string sTmp;
-		while(std::getline(sDataStream,sTmp,'\t')){
-			sVector.emplace_back(sTmp);
-		}
-		if(szBuffer){
-			delete[]szBuffer;
-		}
-	}
-	
-	return sVector;
+    char szTmpSize[g_iBufferSize];
+    char szTmpVector[g_iBufferSize];
+    std::vector<std::string> sVector;
+    recv(ClientSocket,szTmpSize,g_iBufferSize,0);
+    for(int i = 0;i<atoi(szTmpSize);i++){
+        recv(ClientSocket,szTmpVector,g_iBufferSize,0);
+        sVector.push_back(std::string(szTmpVector));
+    }
+    return sVector;
 }
 
 bool Client::GetRecipesByOwnersId(const int iOwnersId,std::vector<std::string>&szRecipes){
@@ -329,7 +332,7 @@ bool Client::DeleteRecipe(const int iRecipeId){
 bool Client::RegisterUser(SUser& User){
 	bool bResult = false;
 	char ServerRespond[g_iMessageSize];
-	send(ClientSocket,	reinterpret_cast<char*>(&User),sizeof(User),0);
+    SendUser(User);
 	LogInfo("Register request was sent with login: "+User.m_sUserName);
 	recv(ClientSocket,ServerRespond,g_iMessageSize,0);
 	if(strstr(ServerRespond,"USER_EXISTS")){
@@ -338,22 +341,22 @@ bool Client::RegisterUser(SUser& User){
 	}
 	else{
 		LogInfo("New "+ User.m_sUserName+" was added to main user data base");
-		std::cout<<"New "+ User.m_sUserName+" was added to main user data base"<<std::endl;
 
-		recv(ClientSocket,reinterpret_cast<char*>(&ClientUser),sizeof(ClientUser),0);
-		std::cout<<"User id:"<<ClientUser.m_nID<<std::endl;
+        User  = ReceiveUser ();
+
 		bResult = true;
 	}
 	return bResult;
 }  
 void Client::SendUser(SUser&User){
 	std::stringstream sDataStream;
-	sDataStream<<User.m_nID<<"\t"<<User.m_sFavorites<<"\t"
+    sDataStream<<std::to_string(User.m_nID)<<"\t"<<User.m_sFavorites<<"\t"
 	<<User.m_sPassword<<"\t"<<User.m_sUserName<<std::endl;
 	std::cout<<"sending size of buffer"<<std::endl;
-	std::string sBufferSize = std::to_string(sDataStream.str().size());
+    std::string sBufferSize = std::to_string(sDataStream.str().size()+1);
 	std::cout<<"size of buffer on client:"<< sBufferSize<<std::endl;
-	send(ClientSocket,sBufferSize.c_str(),sBufferSize.size(),0);
+    send(ClientSocket,sBufferSize.c_str(),g_iBufferSize,0);
+
 	std::cout<<"sending buffer"<<std::endl;
 	send(ClientSocket,sDataStream.str().c_str(),strlen(sDataStream.str().c_str()),0);
 	std::cout<<"sent buffer"<<std::endl;
@@ -367,7 +370,7 @@ SUser Client::ReceiveUser(){
 	std::string sTmp;
 	std::getline(sDataStream,sTmp,'\t');
 	SUser User;
-	User.m_nID = stoi(sTmp);
+    User.m_nID = stoi(sTmp);
 	std::getline(sDataStream,sTmp,'\t');
 	User.m_sFavorites = sTmp;
 	std::getline(sDataStream,sTmp,'\t');
@@ -380,20 +383,16 @@ SUser Client::ReceiveUser(){
 	return User;
 }
 bool Client::LoginUser(SUser& User){
-	std::cout<<"login user"<<std::endl;
 	bool bResult = false;
-	SendUser(User);
+    SendUser(User);
 	char szServerRespond[g_iBufferSize];
-	std::cout<<"waiting for respond..."<<std::endl;
 	recv(ClientSocket,szServerRespond,g_iBufferSize,0);
-	std::cout<<"server respond:"<<std::endl;
 	if(strstr(szServerRespond,"USER_DOESNT_EXIST")){
 		LogInfo("Incorrect login or password : "+User.m_sUserName+  " " + User.m_sPassword);
 		std::cout<<"Incorrect login or password : "+User.m_sUserName+  " " + User.m_sPassword<<std::endl;
 	}
 	else{
-		//recv(ClientSocket,reinterpret_cast<char*>(&User),sizeof(User),0);
-		User = ReceiveUser();
+        User = ReceiveUser();
 		LogInfo("Login successful : "+
 			User.m_sUserName + " "
 			 + User.m_sPassword + " "
@@ -404,9 +403,7 @@ bool Client::LoginUser(SUser& User){
 	}
 	return bResult;
 }
-/*char* Client::GetUserPreparedForSending(SUser& User){
-	return reinterpret_cast<char*>(&User);
-}*/
+
 void Client::SetClientUser(const std::string& sUserName, const std::string& sPassword){
 	ClientUser.m_sUserName = sUserName;
 	ClientUser.m_sPassword = sPassword;
@@ -421,10 +418,10 @@ void Client::SendRecipe(SRecipe&Recipe){
 	<<Recipe.m_nIdOfOwner<<"\t"<<Recipe.m_sAmountOfIngredients<<"\t"
 	<<Recipe.m_sCategory<<"\t"<<Recipe.m_sCookingAlgorithm<<"\t"
 	<<Recipe.m_sCuisine<<"\t"<<Recipe.m_sIngredients<<"\t"<<Recipe.m_sName<<"\t"
-	<<Recipe.m_sUnitOfMeasurement;
-	send(ClientSocket,std::to_string(strlen(RecipeDataStream.str().c_str())).c_str(),
+    <<Recipe.m_sUnitOfMeasurement;
+    send(ClientSocket,std::to_string(strlen(RecipeDataStream.str().c_str())).c_str(),
 	g_iMessageSize,0);
-	send(ClientSocket,RecipeDataStream.str().c_str(),strlen(RecipeDataStream.str().c_str()),0);
+    send(ClientSocket,RecipeDataStream.str().c_str(),strlen(RecipeDataStream.str().c_str()),0);
 }
 bool Client::AddRecipeToServer(SRecipe& Recipe){
 	SendRecipe(Recipe);

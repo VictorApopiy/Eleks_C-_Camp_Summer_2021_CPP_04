@@ -11,6 +11,7 @@
 #include "SUser.h"
 #include <sstream>
 #include <vector>
+
 #include <algorithm>
 
 #include "Requests.h"
@@ -20,16 +21,7 @@ const int g_iMessageSize  = 16;
 const int g_iBufferSize  = 1024;
 const std::string sIPAddressFileName = "IPAddressFile.bin";
 const std::string sClientLogFileName = "ClientLogFile.bin";
-#pragma comment(lib, "ws2_32.lib")
-#pragma warning(disable:4996)
-/*
-I have changed the requests to server from commandline inputs to function MakeRequest that just sends the request
-to server and server should handle it
-I have tried everything with user input to commandline, everything was working fine but with the idea of having function
-that sends request it stoped working
-I don`t know what is the problem here
-but code was working without troubles
-*/
+
 class Client {
 private:
 	WSAData WSA;
@@ -46,7 +38,6 @@ private:
 	SUser ClientUser;
 private:
 	void Init();
-	//char* GetUserPreparedForSending(SUser& User);
 
 	void SendRecipe(SRecipe&Recipe);
 
@@ -54,9 +45,10 @@ private:
 	SUser ReceiveUser();
 
 	SRecipe ReceiveRecipe(SOCKET &ClientSocket);
-	void SendStringVector(std::vector<std::string>&Vector);
+
 	std::vector<std::string> ReceiveStringVector();
 	void LogInfo(const std::string& sInfo);
+    void SendStringVector(std::vector<std::string>&Vector);
 public:
 
 	//Basic client operations
@@ -88,7 +80,8 @@ public:
 	bool DeleteRecipe(const int iRecipeId);
 	//Requests:
 
-	void MakeRequest(const std::string& sRequest);
+    void MakeRequest(const std::string& sRequest);
+    std::string ReceiveMessage();
 };
 
 //
