@@ -14,7 +14,7 @@
 #include <vector>
 #include "UserDataBase/CUserDataBase.h"
 #include "UserDatabase/sqlite3.h"
-
+#include <cstring>
 #include "Requests.h"
 
 #include <algorithm>
@@ -63,8 +63,11 @@ public:
 	CServer();
 	~CServer();
 	void Start();
+
 	//method for sending file to client. it receives string filename and client socket as a parameters
 	void SendFile(const std::string& sFileName,SOCKET& ClientSocket);
+
+    void RecvFile(SOCKET&ClientSocket);
 	void HandleClient(SOCKET ClientSocket);
 	//checking the existence of ip address for server in special file
 	bool CheckIP();
@@ -87,6 +90,10 @@ public:
 	bool ChangeRecipe(SOCKET&ClientSocket);
 
 	bool DeleteRecipe(SOCKET&ClientSocket);
+
+    bool AddRecipeToFavouritesForClient(SOCKET&ClientSocket);
+
+    bool SendFavouriteRecipes(SOCKET&ClientSocket);
 };
 
 #endif 

@@ -39,12 +39,14 @@ void Client::SetClient(const std::string& sIpAddress, const int iPort){
 	IPAddressFile.open(sIPAddressFileName,std::ios::binary|std::ios::out|std::ios::trunc);
 	IPAddressFile<<sIpAddress<<std::endl;
 	IPAddressFile<<iPort;
-	IPAddressFile.close();
+    IPAddressFile.close();
+    LogInfo("Client was set with ip:"+sIpAddress+":"+std::to_string(iPort));
 }
 
 std::string Client::ReceiveMessage(){
     ZeroMemory(szMainBuffer,g_iBufferSize);
     recv(ClientSocket,szMainBuffer,g_iBufferSize,0);
+    LogInfo("Message received:"+std::string(szMainBuffer));
     return std::string(szMainBuffer);
 }
 
@@ -66,6 +68,7 @@ bool Client::CheckIP(){
 	return bResult;
 }
 SUser& Client::GetClientUser(){
+    LogInfo("Client user was returned :"+ClientUser.m_sUserName);
 	return ClientUser;
 }
 bool Client::TryConnection(){
@@ -91,8 +94,8 @@ void Client::RecvFile(const std::string& sFileName){
 	recv(ClientSocket, szTempSize, g_iMessageSize, 0);
 
 	if (strstr(szTempSize, "FILE_ERROR")) {
-		std::cout << "Couldn`t open file on server" << std::endl;
-		LogInfo("Couldn`t find file "+sFileName+" on server");
+        std::cout << "Couldn`t open file on server" << std::endl;
+        LogInfo("Couldn`t find file "+sFileName+" on server");
 		return;
 	}
 
@@ -106,7 +109,9 @@ void Client::RecvFile(const std::string& sFileName){
 	int iCount = 0;
 	while(iTmpRecvSize>0){
 		iCount = recv(ClientSocket,Buffer,iRecvBufferSize,0);
-		if(iCount==-1)break;
+        if(iCount<0){
+            break;
+        }
 		iTmpRecvSize-=iCount;
 	}
 	LogInfo("File input was received from server");
@@ -119,9 +124,11 @@ void Client::RecvFile(const std::string& sFileName){
 	std::ifstream InputFile;
 	InputFile.open(sFileName,std::ios::binary|std::ios::ate);
 	iTmpRecvSize = InputFile.tellg();
-	std::cout<<"file size = "<<iTmpRecvSize<<" received size = "<<iRecvBufferSize<<std::endl;
+    LogInfo("file size = "+std::to_string(iTmpRecvSize)+" received size = " + std::to_string(iRecvBufferSize));
 	if(iTmpRecvSize!=iRecvBufferSize){
-		send(ClientSocket,"file",strlen("file"),0);
+        send(ClientSocket,std::string(FILE_REQUEST).c_str(),
+             strlen(std::string(FILE_REQUEST).c_str()),0);
+
 		RecvFile(sFileName);
 	}
 }
@@ -180,12 +187,32 @@ SRecipe Client::ReceiveRecipe(SOCKET&ClientSocket){
 }
 
 void Client::SendStringVector(std::vector<std::string>&Vector){
-    char szVectorSize[g_iBufferSize];
+    std::stringstream sDataStream;
+    int iVectorSize = static_cast<int>(Vector.size());
+    std::cout<<"sending vector size"<<std::endl;
+    send(ClientSocket,std::to_string(iVectorSize).c_str(),g_iMessageSize,0);
+    std::cout<<"sent size of vector in string:"<<std::to_string(iVectorSize).c_str()<<std::endl;
+
+    for(size_t i = 0;i<Vector.size();i++){
+             sDataStream<<Vector[i]<<"\t";
+    }
+
+    std::cout<<"buffer created:"<<std::endl;
+    std::cout<<sDataStream.str()<<std::endl;
+    int iDataSize = strlen(sDataStream.str().c_str());
+    std::cout<<"size of buffer in string"<<std::to_string(iDataSize).c_str()<<std::endl;
+    send(ClientSocket,std::to_string(iDataSize).c_str(),g_iMessageSize,0);
+    std::cout<<"size sent"<<std::endl;
+    //Sleep(100);
+    std::cout<<"sending datastream"<<std::endl;
+    send(ClientSocket,sDataStream.str().c_str(),iDataSize,0);
+    std::cout<<"datastream sent"<<std::endl;
+   /* char szVectorSize[g_iBufferSize];
     strcpy(szVectorSize,std::to_string(Vector.size()).c_str());
-    send(ClientSocket,szVectorSize,strlen(szVectorSize),0);
+    send(ClientSocket,std::to_string(Vector.size()).c_str(),g_iBufferSize,0);
     for(size_t i = 0; i<Vector.size();i++){
         send(ClientSocket,Vector[i].c_str(),strlen(Vector[i].c_str()),0);
-    }
+    }*/
 }
 
 bool Client::GetRecipesNeeded(std::vector<std::string>& RecipesNeeded,
@@ -230,34 +257,38 @@ bool Client::FindRecipeByName(const std::string& sRecipeName, SRecipe&RecipeNeed
 	return bResult;
 
 }
-//should be deleted
-void Client::ConnectToServer(){
-	if(TryConnection()){
-		while(true){
-			std::string sMessage;
-			std::cin>>sMessage;
-			send(ClientSocket,sMessage.c_str(),sMessage.size(),0);
-			do{
-				if(strstr(sMessage.c_str(),LOGIN_REQUEST)){
-					ClientUser.m_sUserName = "abc";
-					ClientUser.m_sPassword = "123";
-					LoginUser(ClientUser);
-					std::cout<<ClientUser.m_nID<<std::endl;
-					break;
-				}
-				else{
-					ZeroMemory(szMainBuffer,g_iBufferSize);
-					recv(ClientSocket,szMainBuffer,g_iBufferSize,0);
-					std::cout<<szMainBuffer<<std::endl;
-				}	
-			}while(0);
-			
-		}
-	}
-}
+
 
 std::vector<std::string> Client::ReceiveStringVector(){
-    char szTmpSize[g_iBufferSize];
+    char szTmpSize[g_iMessageSize];
+    char szVectorSize[g_iMessageSize];
+    std::cout<<"recieving vector size"<<std::endl;
+    recv(ClientSocket,szVectorSize,g_iMessageSize,0);
+    std::cout<<"vector size received:"<<atoi(szVectorSize)<<std::endl;
+    recv(ClientSocket,szTmpSize,g_iMessageSize,0);
+    std::cout<<"size in string"<<std::endl;
+    std::cout<<szTmpSize<<std::endl;
+    std::cout<<"received buffer size"<<atoi(szTmpSize)<<std::endl;
+    std::vector<std::string> sVector;
+    if(atoi(szTmpSize)){
+        char* szBuffer = new char[atoi(szTmpSize)];
+        recv(ClientSocket,szBuffer,atoi(szTmpSize),0);
+        std::stringstream sDataStream(szBuffer);
+        std::string sTmp;
+      //  std::cout<<sDataStream.str()<<std::endl;
+        for(int i = 0; i<atoi(szVectorSize);i++){
+            std::getline(sDataStream,sTmp,'\t');
+            sVector.push_back(sTmp);
+        }
+       /* while(std::getline(sDataStream, sTmp,'\t')){
+            sVector.push_back(sTmp);
+        }*/
+        if(szBuffer){
+            delete[]szBuffer;
+        }
+    }
+    return sVector;
+   /* char szTmpSize[g_iBufferSize];
     char szTmpVector[g_iBufferSize];
     std::vector<std::string> sVector;
     recv(ClientSocket,szTmpSize,g_iBufferSize,0);
@@ -265,16 +296,18 @@ std::vector<std::string> Client::ReceiveStringVector(){
         recv(ClientSocket,szTmpVector,g_iBufferSize,0);
         sVector.push_back(std::string(szTmpVector));
     }
-    return sVector;
+    return sVector;*/
 }
 
 bool Client::GetRecipesByOwnersId(const int iOwnersId,std::vector<std::string>&szRecipes){
 	bool bResult = false;
 	send(ClientSocket, std::to_string(iOwnersId).c_str(),strlen(std::to_string(iOwnersId).c_str()),0);
+
 	char szAnswer[g_iBufferSize];
 	recv(ClientSocket,szAnswer,g_iBufferSize,0);
-	if(strstr(szAnswer,"RECIPE_FOUND")){
+    if(strstr(szAnswer,"RECIPE_FOUND")){
 		bResult = true;
+        Sleep(50);
 		szRecipes = ReceiveStringVector();
 		LogInfo("Recipes were found by owner`s id:" + std::to_string(iOwnersId));
 	}
@@ -285,18 +318,23 @@ bool Client::GetRecipesByOwnersId(const int iOwnersId,std::vector<std::string>&s
 }
 bool Client::GetRecipesByName(const std::string& sWord,std::vector<std::string>&szRecipes){
 	bool bResult = false;
-	send(ClientSocket,sWord.c_str(),strlen(sWord.c_str()),0);
-	char szAnswer[g_iBufferSize];
-	recv(ClientSocket,szAnswer,g_iBufferSize,0);
-	if(strstr(szAnswer,"RECIPE_FOUND")){
-		bResult = true;
-		szRecipes = ReceiveStringVector();
-		LogInfo("Recipe/s was/were found on server(GetRecipeByName)");
-	}
-	else{
-		LogInfo("Recipe/s was/were NOT found on server(GetRecipeByName)");
-	}
+    const char* szClearName = "CLEAR_NAME";
 
+    if(sWord.size()==0){
+        send(ClientSocket,szClearName, strlen(szClearName),0);
+    }else{
+        send(ClientSocket,sWord.c_str(),strlen(sWord.c_str()),0);
+        char szAnswer[g_iBufferSize];
+        recv(ClientSocket,szAnswer,g_iBufferSize,0);
+        if(strstr(szAnswer,"RECIPE_FOUND")){
+            bResult = true;
+            szRecipes = ReceiveStringVector();
+            LogInfo("Recipe/s was/were found on server(GetRecipeByName)");
+        }
+        else{
+            LogInfo("Recipe/s was/were NOT found on server(GetRecipeByName)");
+        }
+    }
 	return bResult;
 }
 
@@ -349,38 +387,37 @@ bool Client::RegisterUser(SUser& User){
 	return bResult;
 }  
 void Client::SendUser(SUser&User){
-	std::stringstream sDataStream;
-    sDataStream<<std::to_string(User.m_nID)<<"\t"<<User.m_sFavorites<<"\t"
-	<<User.m_sPassword<<"\t"<<User.m_sUserName<<std::endl;
-	std::cout<<"sending size of buffer"<<std::endl;
-    std::string sBufferSize = std::to_string(sDataStream.str().size()+1);
-	std::cout<<"size of buffer on client:"<< sBufferSize<<std::endl;
-    send(ClientSocket,sBufferSize.c_str(),g_iBufferSize,0);
 
-	std::cout<<"sending buffer"<<std::endl;
-	send(ClientSocket,sDataStream.str().c_str(),strlen(sDataStream.str().c_str()),0);
-	std::cout<<"sent buffer"<<std::endl;
+    std::stringstream sDataStream;
+    sDataStream<<std::to_string(User.m_nID)<<"\t"<<User.m_sFavorites<<"\t"
+    <<User.m_sPassword<<"\t"<<User.m_sUserName<<"\t"<<std::endl;
+    std::cout<<"sending size of buffer"<<std::endl;
+    send(ClientSocket,std::to_string(strlen(sDataStream.str().c_str())).c_str(),g_iBufferSize,0);
+
+    std::cout<<"sending buffer"<<std::endl;
+    send(ClientSocket,sDataStream.str().c_str(),strlen(sDataStream.str().c_str()),0);
+    std::cout<<"sent buffer"<<std::endl;
 }
 SUser Client::ReceiveUser(){
-	char szTmpSize[g_iBufferSize];
-	recv(ClientSocket,szTmpSize,g_iBufferSize,0);
-	char* Buffer = new char[atoi(szTmpSize)];
-	recv(ClientSocket,Buffer,atoi(szTmpSize),0);
-	std::stringstream sDataStream(Buffer);
-	std::string sTmp;
-	std::getline(sDataStream,sTmp,'\t');
-	SUser User;
+    char szTmpSize[g_iBufferSize];
+    recv(ClientSocket,szTmpSize,g_iBufferSize,0);
+    char* Buffer = new char[atoi(szTmpSize)];
+    recv(ClientSocket,Buffer,atoi(szTmpSize),0);
+    std::stringstream sDataStream(Buffer);
+    std::string sTmp;
+    std::getline(sDataStream,sTmp,'\t');
+    SUser User;
     User.m_nID = stoi(sTmp);
-	std::getline(sDataStream,sTmp,'\t');
-	User.m_sFavorites = sTmp;
-	std::getline(sDataStream,sTmp,'\t');
-	User.m_sPassword = sTmp;
-	std::getline(sDataStream,sTmp,'\t');
-	User.m_sUserName = sTmp;
-	if(Buffer){
-		delete[]Buffer;
-	}
-	return User;
+    std::getline(sDataStream,sTmp,'\t');
+    User.m_sFavorites = sTmp;
+    std::getline(sDataStream,sTmp,'\t');
+    User.m_sPassword = sTmp;
+    std::getline(sDataStream,sTmp,'\t');
+    User.m_sUserName = sTmp;
+    if(Buffer){
+        delete[]Buffer;
+    }
+    return User;
 }
 bool Client::LoginUser(SUser& User){
 	bool bResult = false;
@@ -436,6 +473,118 @@ bool Client::AddRecipeToServer(SRecipe& Recipe){
 
 void Client::MakeRequest(const std::string& sRequest){
 	send(ClientSocket,sRequest.c_str(),strlen(sRequest.c_str()),0);
+    LogInfo(sRequest + "request was sent to server");
 }
 
 
+void Client::SendFile(const std::string &sFileName){
+    using std::ios;
+    std::ifstream File;
+    send(ClientSocket,sFileName.c_str(),strlen(sFileName.c_str()),0);
+    Sleep(100);
+    File.open("Files//" + sFileName, ios::binary | ios::ate);
+    if (File.is_open()) {
+        int iDataSize = File.tellg();
+        File.close();
+        File.open("Files//"+sFileName, ios::binary);
+        iDataSize++;
+        send(ClientSocket, std::to_string(iDataSize).c_str(), g_iMessageSize, 0);
+        char* Buffer = new char[iDataSize];
+        File.read(Buffer,iDataSize);
+        int iTmpDataSize = iDataSize;
+        int iCount = 0;
+        while(iTmpDataSize>0){
+            iCount = send(ClientSocket,Buffer,iDataSize,0);
+            Sleep(10);
+            if(iCount<0){
+                break;
+            }
+            iTmpDataSize-=iCount;
+        }
+        if(Buffer){
+            delete[] Buffer;
+        }
+        File.close();
+        LogInfo("File " + sFileName +" was successfully sent to the server");
+    }
+    else {
+        char szErrorBuffer[g_iMessageSize] = "FILE_ERROR";
+        send(ClientSocket, szErrorBuffer, g_iMessageSize, 0);
+    }
+}
+
+bool Client::AddRecipeToFavorites(const std::string sRecipeName){
+    bool bResult = false;
+    LogInfo("Add recipe to favourites func");
+    LogInfo("Sending recipe name...");
+    send(ClientSocket,sRecipeName.c_str(),strlen(sRecipeName.c_str()),0);
+    LogInfo("Recipe name sent:"+sRecipeName);
+    LogInfo("Sending user..");
+    SendUser(ClientUser);
+    LogInfo("User was sent");
+    char szAnswer[g_iBufferSize];
+    recv(ClientSocket,szAnswer,g_iBufferSize,0);
+    LogInfo("Answer received:"+std::string(szAnswer));
+    if(strstr(szAnswer,"RECIPE_FOUND")){
+        char szNewFavoritesList[g_iBufferSize];
+        LogInfo("Receiving new favourites list");
+        recv(ClientSocket,szNewFavoritesList,g_iBufferSize,0);
+        LogInfo("List received:"+std::string(szNewFavoritesList));
+        ClientUser.m_sFavorites = std::string(szNewFavoritesList);
+        bResult = true;
+    }else if(strstr(szAnswer,"RECIPE_ALREADY_IN_LIST")){
+        LogInfo("Recipe is already in the list of favourites!");
+    }
+    else{
+        LogInfo("There is no such name in DataBase of recipes:(");
+    }
+    return bResult;
+}
+
+bool Client::GetFavouriteRecipes(std::vector<std::string>& sResultVector){
+    bool bResult = false;
+    if(ClientUser.m_sFavorites.size()==0){
+        std::string sFavouritesClear = "FAVOURITES_CLEAR";
+        send(ClientSocket,sFavouritesClear.c_str(),strlen(sFavouritesClear.c_str()),0);
+    }else{
+        LogInfo("Sending favourites list:"+ClientUser.m_sFavorites);
+        send(ClientSocket,ClientUser.m_sFavorites.c_str(),strlen(ClientUser.m_sFavorites.c_str()),0);
+        LogInfo("Favourites list was sent");
+        char szAnswer[g_iBufferSize];
+        recv(ClientSocket,szAnswer,g_iBufferSize,0);
+        LogInfo("Received answer:"+std::string(szAnswer));
+        if(strstr(szAnswer,"RECIPE_FOUND")){
+            LogInfo("List of favourites was found on server");
+            sResultVector = ReceiveStringVector();
+            LogInfo("String vector of favourite recipes was received");
+            bResult = true;
+        }else{
+            LogInfo("Recipes were not found on server:(");
+        }
+    }
+
+    return bResult;
+}
+
+bool Client::DeleteRecipeFromFavourites(const std::string sRecipeName){
+    bool bResult = true;
+    MakeRequest(std::string(GET_RECIPE_BY_NAME_REQUEST));
+    SRecipe RecipeToDelete;
+    if(FindRecipeByName(sRecipeName,RecipeToDelete)){
+        std::string sRecipeId = std::to_string(RecipeToDelete.m_nId);
+        size_t uPosToDeleteBegin = ClientUser.m_sFavorites.find(sRecipeId);
+        if(uPosToDeleteBegin!=std::string::npos){
+            ClientUser.m_sFavorites.erase(uPosToDeleteBegin,sRecipeId.length()+1);
+            LogInfo("DeleteRecipeFromFavourites: "
+                    "Favourite recipe with id:"+sRecipeId+"\nwas erased from favourites' list");
+        }else{
+            LogInfo("DeleteRecipeFromFavourites: Couldn't find the recipe in favourites' list of user");
+            bResult = false;
+        }
+    }
+    else{
+        bResult = false;
+        LogInfo("DeleteRecipeFromFavourites: Recipe "+sRecipeName+" was not found on server");
+    }
+    return bResult;
+}

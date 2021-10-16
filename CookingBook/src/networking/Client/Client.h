@@ -59,9 +59,8 @@ public:
 	void SetClient(const std::string& sIpaddress,const int iPort);
 	bool TryConnection();
 	void SetClientUser(const std::string& sUserName, const std::string& sPassword);
-
+    void SendFile(const std::string& sFileName);
 	//User operations
-	void ConnectToServer();//should be deleted 
 	bool RegisterUser(SUser& User);
 	bool LoginUser(SUser& User);
 	SUser& GetClientUser();
@@ -78,6 +77,12 @@ public:
 	bool GetRecipesByName(const std::string& sWord,std::vector<std::string>&szRecipes);
 	bool ChangeRecipe(SRecipe&Recipe);
 	bool DeleteRecipe(const int iRecipeId);
+
+    bool AddRecipeToFavorites(const std::string sRecipeName);
+    bool GetFavouriteRecipes(std::vector<std::string>& sResultVector);
+
+    //the single function that  doesn`t need request before the function call
+    bool DeleteRecipeFromFavourites(const std::string sRecipeName);
 	//Requests:
 
     void MakeRequest(const std::string& sRequest);
@@ -87,3 +92,10 @@ public:
 //
 #endif //Client
 //отче наш...
+/*
+Adding recipe to favourites idea:
+user sends the name of the recipe that he wants to add to favourites
+it receives the respond from the server (whether recipe is already in the list of favourites or can't be added)
+if server responds with the OK message Client receives new list of favourites (std::string) and puts it to client
+user structure
+*/
