@@ -92,10 +92,4 @@ public:
 //
 #endif //Client
 //отче наш...
-/*
-Adding recipe to favourites idea:
-user sends the name of the recipe that he wants to add to favourites
-it receives the respond from the server (whether recipe is already in the list of favourites or can't be added)
-if server responds with the OK message Client receives new list of favourites (std::string) and puts it to client
-user structure
-*/
+
