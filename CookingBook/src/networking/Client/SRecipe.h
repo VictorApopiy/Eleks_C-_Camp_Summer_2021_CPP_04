@@ -14,4 +14,14 @@ struct SRecipe {
 		bool m_bIsAccessible;
 		int m_nIdOfOwner;
 		SRecipe();
-	};
+};
+enum ECategories{
+    SNACKS_AND_SANDWICHES=1,
+    SALADS=2,
+    FIRST_COURSES=3,
+    SIDE_DISHES=4,
+    SECOND_COURSES=5,
+    DESSERTS=6,
+    SAUCES=7,
+    DRINKS=8
+};
