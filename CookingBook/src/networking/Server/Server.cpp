@@ -133,6 +133,14 @@ void CServer::HandleClient(SOCKET ClientSocket){
 		if(recv(ClientSocket, szMainBuffer, g_uBufferSize, 0)>0){
 			std::cout<<"Buffer received:"<<szMainBuffer<<std::endl;
 			do{
+                if(strstr(szMainBuffer,DELETE_FROM_FAVOURITES_REQUEST)){
+                    if(DeleteRecipeFromFavouritesFromUser(ClientSocket)){
+                        LogInfo("Recipe was successfully deleted from favourites for client");
+                    }else{
+                        LogInfo("Recipe was not deleted from favourites for client");
+                    }
+                    break;
+                }
                 if(strstr(szMainBuffer,GET_FAVOURITE_RECIPES_REQUEST)){
                     LogInfo(std::string(GET_FAVOURITE_RECIPES_REQUEST)+" request was received");
                     SendFavouriteRecipes(ClientSocket);
@@ -487,13 +495,13 @@ bool CServer::SendRecipesNeededForClient(SOCKET&ClientSocket){
 	RecipesCategoryValues,RecipesIngredients;
     std::cout<<"Receiving columns..."<<std::endl;
     RecipesCategories = ReceiveStringVector(ClientSocket);
-    std::for_each(begin(RecipesCategories),end(RecipesCategories),[](const std::string& s){std::cout<<s<<std::endl;});
+    //std::for_each(begin(RecipesCategories),end(RecipesCategories),[](const std::string& s){std::cout<<s<<std::endl;});
     std::cout<<"Receiving columns' values..."<<std::endl;
     RecipesCategoryValues = ReceiveStringVector(ClientSocket);
-    std::for_each(begin(RecipesCategoryValues),end(RecipesCategoryValues),[](const std::string& s){std::cout<<s<<std::endl;});
+    //std::for_each(begin(RecipesCategoryValues),end(RecipesCategoryValues),[](const std::string& s){std::cout<<s<<std::endl;});
     std::cout<<"Receiving ingredients..."<<std::endl;
     RecipesIngredients =  ReceiveStringVector(ClientSocket);
-    std::for_each(begin(RecipesIngredients),end(RecipesIngredients),[](const std::string& s){std::cout<<s<<std::endl;});
+    //std::for_each(begin(RecipesIngredients),end(RecipesIngredients),[](const std::string& s){std::cout<<s<<std::endl;});
 
 	int iRecipesNeededSize = 0;
 
@@ -505,6 +513,7 @@ bool CServer::SendRecipesNeededForClient(SOCKET&ClientSocket){
 	const char* szRecipeNotFound = "RECIPE_NOT_FOUND";
 	if(RecipesNeeded.size()!=0){
 		send(ClientSocket,szRecipeFound,strlen(szRecipeFound),0);
+        Sleep(100);
 		SendStringVector(RecipesNeeded,ClientSocket);
 		bResult = true;
         LogInfo("Recipes needed were found on server");
@@ -539,10 +548,9 @@ void CServer::SendRecipesByOwnersIdToClient(SOCKET&ClientSocket){
 }
 
 bool CServer::FindRecipeByNameFromClient(SOCKET&ClientSocket){
-	char szTmpSize[g_iMessageSize];
-	recv(ClientSocket,szTmpSize,g_iMessageSize,0);
-	char* szRecipeName = new char[atoi(szTmpSize)];
-	recv(ClientSocket,szRecipeName,atoi(szTmpSize),0);
+
+    char szRecipeName[g_uBufferSize];
+    recv(ClientSocket,szRecipeName,g_uBufferSize,0);
 	const char* szRecipeFound = "RECIPE_FOUND";
 	const char* szRecipeNotFound = "RECIPE_NOT_FOUND";
 	bool bResult = true;
@@ -559,9 +567,6 @@ bool CServer::FindRecipeByNameFromClient(SOCKET&ClientSocket){
         std::cout<<"Recipe was not found by name:"<<(std::string(szRecipeName))<<std::endl;
 		send(ClientSocket,szRecipeNotFound,strlen(szRecipeNotFound),0);
 		bResult = false;
-	}
-	if(szRecipeName){
-		delete[]szRecipeName;
 	}
 	return bResult;
 }
@@ -666,7 +671,7 @@ void CServer::RecvFile(SOCKET&ClientSocket){
     recv(ClientSocket,szFileName,g_uBufferSize,0);
     std::string sFileName(szFileName);
 
-    LogInfo("Name of the file'"+ std::string(szMainBuffer)+ "' was requested");
+    LogInfo("Name of the file'"+ std::string(szFileName)+ "' was requested");
     char szTempSize[g_iMessageSize];
     recv(ClientSocket, szTempSize, g_iMessageSize, 0);
 
@@ -681,7 +686,7 @@ void CServer::RecvFile(SOCKET&ClientSocket){
     char *Buffer = new char[iRecvBufferSize];
 
     std::ofstream File;
-    File.open("D:\\CookingServer\\CookingServer\\Files\\"+sFileName, std::ios::binary);
+    File.open("CookingServer\\Files\\"+sFileName, std::ios::binary);
     int iTmpRecvSize = iRecvBufferSize;
     int iCount = 0;
     while(iTmpRecvSize>0){
@@ -699,7 +704,7 @@ void CServer::RecvFile(SOCKET&ClientSocket){
     }
     File.close();
     std::ifstream InputFile;
-    InputFile.open("D:\\CookingServer\\CookingServer\\Files\\"+sFileName,std::ios::binary|std::ios::ate);
+    InputFile.open("CookingServer\\Files\\"+sFileName,std::ios::binary|std::ios::ate);
     iTmpRecvSize = InputFile.tellg();
     InputFile.close();
     LogInfo("file size = "+std::to_string(iTmpRecvSize)+" received size = " + std::to_string(iRecvBufferSize));
@@ -708,34 +713,20 @@ void CServer::RecvFile(SOCKET&ClientSocket){
 bool CServer::AddRecipeToFavouritesForClient(SOCKET &ClientSocket){
     bool bResult = false;
     LogInfo("Add recipe to favs func:");
-    char szRecipeName[g_uBufferSize];
-    LogInfo("Receiving recipe name...");
-    recv(ClientSocket,szRecipeName,g_uBufferSize,0);
-    LogInfo("Name of the resipe received:"+std::string(szRecipeName));
-    LogInfo("Receiving user...");
-    UsersDataBase::SUser ReceivedUser = ReceiveUser(ClientSocket);
-    LogInfo("User received:"+ReceivedUser.m_sUserName);
-    RecipesDataBase::SRecipe sTmpRecipe =
-            RecipesDataBase::CRecipesDataBase::SelectRecipeByName(std::string(szRecipeName));
-    if(strstr(ReceivedUser.m_sFavorites.c_str(),std::to_string(sTmpRecipe.m_nId).c_str())){
-        LogInfo("Recipe already exists in user's favourites!");
-        const char* szRecipeAlreadyInList = "RECIPE_ALREADY_IN_LIST";
-        send(ClientSocket,szRecipeAlreadyInList,strlen(szRecipeAlreadyInList),0);
-    }
-    else if(sTmpRecipe.m_nAmountOfPortions==0){
-        LogInfo("There is no recipe with such name");
-        const char* szRecipeNotFound = "RECIPE_NOT_FOUND";
-        send(ClientSocket,szRecipeNotFound,strlen(szRecipeNotFound),0);
-    }
-    else{
-        LogInfo("Recipe was found");
-        const char* szResipeFound = "RECIPE_FOUND";
-        send(ClientSocket,szResipeFound,strlen(szResipeFound),0);
+    char szRecipeId[g_uBufferSize];
+    recv(ClientSocket,szRecipeId,g_uBufferSize,0);
+    UsersDataBase::SUser ClientUser = ReceiveUser(ClientSocket);
+    int iRecipeId = atoi(szRecipeId);
+    std::string sRecipeAdded = "RECIPE_ADDED";
+    std::string sRecipeNotAdded = "RECIPE_NOT_ADDED";
+    if(UsersDataBase::CUsersDataBase::AddToFavorites(ClientUser,iRecipeId)){
+        send(ClientSocket,sRecipeAdded.c_str(),sRecipeAdded.size()+1,0);
+        Sleep(100);
+        SendUser(ClientUser,ClientSocket);
         bResult = true;
-        UsersDataBase::CUsersDataBase::AddToFavorites(ReceivedUser,sTmpRecipe.m_nId);
-        LogInfo("Sending new favourites list to client...");
-        send(ClientSocket,ReceivedUser.m_sFavorites.c_str(),strlen(ReceivedUser.m_sFavorites.c_str()),0);
-        LogInfo("New list was sent:"+ReceivedUser.m_sFavorites);
+    }else{
+       send(ClientSocket,sRecipeNotAdded.c_str(),sRecipeNotAdded.size()+1,0);
+
     }
     return bResult;
 }
@@ -760,6 +751,29 @@ bool CServer::SendFavouriteRecipes(SOCKET &ClientSocket){
             const char* szRecipeNotFound = "RECIPE_NOT_FOUND";
             send(ClientSocket,szRecipeNotFound,strlen(szRecipeNotFound),0);
         }
+    }
+    return bResult;
+}
+
+
+bool CServer::DeleteRecipeFromFavouritesFromUser(SOCKET &ClientSocket){
+    bool bResult = false;
+
+    char szRecipeId[g_iMessageSize];
+    recv(ClientSocket,szRecipeId,g_iMessageSize,0);
+    int iRecipeId = atoi(szRecipeId);
+    UsersDataBase::SUser ClientUser = ReceiveUser(ClientSocket);
+    std::string sPreviousRecipe = ClientUser.m_sFavorites;
+    UsersDataBase::CUsersDataBase::DeleteFromFavorites(ClientUser,iRecipeId);
+    std::string sRecipeDeleted = "RECIPE_DELETED";
+    std::string sRecipeNotDeleted = "RECIPE_NOT_DELETED";
+    if(sPreviousRecipe!=ClientUser.m_sFavorites){
+        send(ClientSocket,sRecipeDeleted.c_str(),sRecipeDeleted.size()+1,0);
+        Sleep(100);
+        SendUser(ClientUser,ClientSocket);
+        bResult = true;
+    }else{
+        send(ClientSocket,sRecipeNotDeleted.c_str(),sRecipeNotDeleted.size()+1,0);
     }
     return bResult;
 }

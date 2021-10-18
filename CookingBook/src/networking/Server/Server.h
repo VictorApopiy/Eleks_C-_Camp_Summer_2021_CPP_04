@@ -94,6 +94,8 @@ public:
     bool AddRecipeToFavouritesForClient(SOCKET&ClientSocket);
 
     bool SendFavouriteRecipes(SOCKET&ClientSocket);
+
+    bool DeleteRecipeFromFavouritesFromUser(SOCKET& ClientSocket);
 };
 
 #endif 
